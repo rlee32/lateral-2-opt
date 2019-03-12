@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Pair.h"
 #include "Swap.h"
 #include "TourModifier.h"
 #include "solver.h"
@@ -52,39 +53,24 @@ inline std::vector<Swap> find_swaps(const TourModifier& tour
     return swaps;
 }
 
-inline void test_range(const TourModifier& tour)
-{
-    constexpr primitives::length_t max_cost {100};
-    for (primitives::length_t i {0}; i < max_cost; ++i)
-    {
-        find_swaps(tour, i);
-    }
-}
-
-inline Swap restricted_first_improvement(const TourModifier& tour
-    , const primitives::point_id_t first_min
-    , const primitives::point_id_t first_max
-    , const primitives::point_id_t second_min
-    , const primitives::point_id_t second_max)
+inline Swap restricted_first_improvement(const TourModifier& tour, const Pair& restriction)
 {
     constexpr primitives::point_id_t start {0};
     // first segment cannot be compared with last segment.
     auto end {tour.prev(start)};
     const auto first_old_length {tour.length(start)};
+    const Segment first_segment(start, tour.next(start));
     for (primitives::point_id_t i {tour.next(tour.next(start))}; i != end; i = tour.next(i))
     {
         const auto current_length {first_old_length + tour.length(i)};
         const auto improvement {solver::compute_improvement(tour, start, i, current_length)};
         if (improvement > 0)
         {
-            if (first_min == std::min(start, tour.next(start))
-                and first_max == std::max(start, tour.next(start))
-                and second_min == std::min(i, tour.next(i))
-                and second_max == std::max(i, tour.next(i)))
+            const Pair removed(first_segment, Segment(i, tour.next(i)));
+            if (restriction != removed)
             {
-                continue;
+                return {start, i, improvement};
             }
-            return {start, i, improvement};
         }
     }
 
@@ -93,20 +79,18 @@ inline Swap restricted_first_improvement(const TourModifier& tour
     {
         const auto first_old_length {tour.length(i)};
         auto j {tour.next(tour.next(i))};
+        const Segment first_segment(i, tour.next(i));
         while (j != start)
         {
             const auto current_length {first_old_length + tour.length(j)};
             const auto improvement {solver::compute_improvement(tour, i, j, current_length)};
             if (improvement > 0)
             {
-                if (first_min == std::min(start, tour.next(start))
-                    and first_max == std::max(start, tour.next(start))
-                    and second_min == std::min(i, tour.next(i))
-                    and second_max == std::max(i, tour.next(i)))
+                const Pair removed(first_segment, Segment(j, tour.next(j)));
+                if (restriction != removed)
                 {
-                    continue;
+                    return {i, j, improvement};
                 }
-                return {i, j, improvement};
             }
             j = tour.next(j);
         }
@@ -122,13 +106,10 @@ inline TourModifier perturbation_climb(const std::vector<Swap>& swaps, const Tou
     {
         TourModifier new_tour(tour);
         new_tour.move(swap.a, swap.b);
+        const Pair restriction(Segment(swap.a, swap.b), Segment(tour.next(swap.a), tour.next(swap.b)));
         while (true)
         {
-            const auto new_swap {restricted_first_improvement(new_tour
-                , std::min(swap.a, swap.b)
-                , std::max(swap.a, swap.b)
-                , std::min(tour.next(swap.a), tour.next(swap.b))
-                , std::max(tour.next(swap.a), tour.next(swap.b)))};
+            const auto new_swap {restricted_first_improvement(new_tour, restriction)};
             if (new_swap.improvement == 0)
             {
                 break;

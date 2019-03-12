@@ -1,7 +1,5 @@
-#include "LengthMap.h"
 #include "TourModifier.h"
 #include "fileio.h"
-#include "primitives.h"
 #include "lateral.h"
 #include "solver.h"
 
@@ -22,31 +20,33 @@ int main(int argc, const char** argv)
     const auto initial_tour = fileio::initial_tour(argc, argv, x.size());
 
     // Initialize tour modifier.
-    TourModifier tour_modifier(initial_tour, x, y);
-    const auto initial_tour_length {tour_modifier.length()};
+    TourModifier tour(initial_tour, x, y);
+    const auto initial_tour_length {tour.length()};
     std::cout << "Initial tour length: " << initial_tour_length << std::endl;
 
-    // Optimization loop.
-    solver::hill_climb(tour_modifier);
+    // Standard 2-opt hill-climbing.
+    solver::hill_climb(tour);
 
     // Save result.
-    const auto final_length {tour_modifier.length()};
+    const auto final_length {tour.length()};
     if (initial_tour_length > final_length)
     {
         auto save_file_prefix {fileio::extract_filename(argv[1])};
-        fileio::write_ordered_points(tour_modifier.order()
+        fileio::write_ordered_points(tour.order()
             , "saves/" + save_file_prefix + "_" + std::to_string(final_length) + ".txt");
     }
 
-    lateral::test_range(tour_modifier);
-    auto best_tour {tour_modifier};
+    // Perturbation hill-climbing.
+    auto best_tour {tour};
     while (true)
     {
         const auto new_tour {lateral::perturbation_climb(best_tour)};
-        if (new_tour.length() >= best_tour.length())
+        const auto new_length {new_tour.length()};
+        if (new_length >= best_tour.length())
         {
             break;
         }
+        std::cout << "perturbation improvement: " << new_length << std::endl;
         best_tour = new_tour;
     }
     std::cout << "final length: " << best_tour.length() << std::endl;
