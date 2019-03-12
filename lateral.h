@@ -5,21 +5,30 @@
 #include "TourModifier.h"
 #include "solver.h"
 
+#include <algorithm> // min
+
 namespace lateral {
 
 inline bool is_valid_move(const TourModifier& tour
     , primitives::point_id_t i
     , primitives::point_id_t j
     , primitives::length_t current_length
-    , primitives::length_t desired_cost)
+    , primitives::length_t desired_cost
+    , primitives::length_t& next_cost)
 {
     auto new_length {tour.length_map().compute_length(i, j)};
     new_length += tour.length_map().compute_length(tour.next(i), tour.next(j));
-    return new_length == current_length + desired_cost;
+    const auto target_length {current_length + desired_cost};
+    if (new_length > target_length)
+    {
+        next_cost = std::min(next_cost, desired_cost + new_length - target_length);
+    }
+    return new_length == target_length;
 }
 
 inline std::vector<Swap> find_swaps(const TourModifier& tour
-    , primitives::length_t cost)
+    , primitives::length_t cost
+    , primitives::length_t& next_cost)
 {
     std::vector<Swap> swaps;
     constexpr primitives::point_id_t start {0};
@@ -29,7 +38,7 @@ inline std::vector<Swap> find_swaps(const TourModifier& tour
     for (primitives::point_id_t i {tour.next(tour.next(start))}; i != end; i = tour.next(i))
     {
         const auto current_length {first_old_length + tour.length(i)};
-        if (is_valid_move(tour, start, i, current_length, cost))
+        if (is_valid_move(tour, start, i, current_length, cost, next_cost))
         {
             swaps.push_back({start, i, cost});
         }
@@ -43,7 +52,7 @@ inline std::vector<Swap> find_swaps(const TourModifier& tour
         while (j != start)
         {
             const auto current_length {first_old_length + tour.length(j)};
-            if (is_valid_move(tour, i, j, current_length, cost))
+            if (is_valid_move(tour, i, j, current_length, cost, next_cost))
             {
                 swaps.push_back({i, j, cost});
             }
@@ -125,24 +134,32 @@ inline TourModifier perturbation_climb(const std::vector<Swap>& swaps, const Tou
     return tour;
 }
 
-inline TourModifier perturbation_climb(const TourModifier& tour, primitives::length_t cost)
+inline TourModifier perturbation_climb(const TourModifier& tour, primitives::length_t cost, primitives::length_t& next_cost)
 {
-    const auto swaps {find_swaps(tour, cost)};
+    const auto swaps {find_swaps(tour, cost, next_cost)};
     return perturbation_climb(swaps, tour);
 }
 
 inline TourModifier perturbation_climb(const TourModifier& tour)
 {
     const auto original_length {tour.length()};
-    constexpr primitives::length_t max_cost {1000};
-    for (primitives::length_t i {0}; i < max_cost; ++i)
+    primitives::length_t current_cost {0};
+    while (true)
     {
-        const auto new_tour {perturbation_climb(tour, i)};
+        std::cout << "trying perturbation cost: " << current_cost << std::endl;
+        primitives::length_t next_cost {constants::invalid_length};
+        const auto new_tour {perturbation_climb(tour, current_cost, next_cost)};
         if (new_tour.length() < original_length)
         {
             return new_tour;
         }
+        if (next_cost == constants::invalid_length)
+        {
+            break;
+        }
+        current_cost = next_cost;
     }
+    std::cout << "No more perturbations left to try." << std::endl;
     return tour;
 }
 
