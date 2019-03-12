@@ -1,5 +1,6 @@
-This aims to be as simple as possible for a 2-opt hill-climbing solver: O(n^2) and first-improvement.
-This is intended to serve as a testing ground for perturbation strategies.
+The focus of this implementation is to utilize low-cost 2-opt perturbations to find new local optima.
+
+Perturbations are tried in order of cost, starting from 0, until no perturbations result in improvement.
 
 Use plot.py to visualize tsp instances and tours.
 
