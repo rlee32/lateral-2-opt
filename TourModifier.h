@@ -1,10 +1,8 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
 #include <cstdlib> // abort
 #include <iostream>
-#include <utility> // swap
 #include <vector>
 
 #include "LengthMap.h"

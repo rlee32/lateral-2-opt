@@ -17,4 +17,5 @@ struct Pair
     bool operator!=(const Pair& other) const
     {
         return not operator==(other);
-    }};
+    }
+};
